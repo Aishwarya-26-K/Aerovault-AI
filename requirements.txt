@@ -1,0 +1,23 @@
+# Web API (Phase 6)
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+
+# RAG core
+langchain>=0.3.0
+langchain-community>=0.3.0
+langchain-text-splitters>=0.3.0
+
+# LLM providers (Phase 5 — install the one you use)
+langchain-google-genai>=2.0.0
+langchain-openai>=0.2.0
+
+# Embeddings + vector store (Phase 3)
+sentence-transformers>=3.0.0
+faiss-cpu>=1.9.0
+
+# PDF loading (Phase 2)
+pypdf>=5.0.0
+
+# Configuration (Phase 1)
+python-dotenv>=1.0.0
+pydantic-settings>=2.6.0
