@@ -8,6 +8,7 @@ from app.retrieval.retriever import Retriever
 router = APIRouter()
 
 
+# Create components once
 retriever = Retriever()
 rag = RAGChain(retriever)
 
@@ -17,11 +18,8 @@ class QuestionRequest(BaseModel):
 
 
 @router.post("/ask")
-def ask(request: QuestionRequest):
+def ask_question(request: QuestionRequest):
 
-    answer = rag.ask(request.question)
+    result = rag.ask(request.question)
 
-    return {
-        "question": request.question,
-        "answer": answer
-    }
+    return result

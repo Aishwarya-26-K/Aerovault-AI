@@ -1,9 +1,21 @@
+"""
+RAG Chain - Level 2 enhancement
+
+Adds:
+- retrieval confidence checking
+- hallucination prevention
+- source-aware answers
+"""
+
+from app.config import get_settings
 from app.llm.generator import get_llm
 
 
 class RAGChain:
 
     def __init__(self, retriever):
+
+        self.settings = get_settings()
         self.retriever = retriever
         self.llm = get_llm()
 
@@ -12,49 +24,87 @@ class RAGChain:
 
         results = self.retriever.search(question)
 
-        context_parts = []
 
-        for item in results:
-
-            # Case 1: (Document, score)
-            if isinstance(item, tuple):
-                doc = item[0]
-                context_parts.append(doc.page_content)
-
-            # Case 2: LangChain Document
-            elif hasattr(item, "page_content"):
-                context_parts.append(item.page_content)
-
-            # Case 3: dictionary
-            elif isinstance(item, dict):
-                context_parts.append(
-                    item.get("content")
-                    or item.get("text")
-                    or str(item)
-                )
+        if not results:
+            return {
+                "question": question,
+                "answer": "No relevant information found.",
+                "sources": [],
+                "confidence": 0
+            }
 
 
-        context = "\n\n".join(context_parts)
+        # FAISS distance score:
+        # lower distance = better match
+        best_score = min(
+            item["score"]
+            for item in results
+        )
+
+
+        # convert distance to confidence
+        confidence = round(
+            1 / (1 + best_score),
+            2
+        )
+
+
+        # Level 2 threshold
+        threshold = 0.35
+
+
+        if confidence < threshold:
+
+            return {
+                "question": question,
+                "answer":
+                    "I could not find enough information in the provided aviation documents.",
+                "sources": [
+                    {
+                        "file": item["filename"],
+                        "page": item["page"]
+                    }
+                    for item in results
+                ],
+                "confidence": confidence
+            }
+
+
+        context = "\n\n".join(
+            item["text"]
+            for item in results
+        )
 
 
         prompt = f"""
 You are an aviation assistant.
 
-Answer only using the provided context.
-
-If the answer is not present in the context, say:
-Information not available in provided documents.
+Answer ONLY from the context.
+If information is missing, say so.
 
 Context:
-
 {context}
 
-Question:
 
+Question:
 {question}
+
+Answer:
 """
 
 
         response = self.llm.invoke(prompt)
 
-        return response.content
+
+        return {
+            "question": question,
+            "answer": response.content,
+            "sources": [
+                {
+                    "file": item["filename"],
+                    "page": item["page"]
+                }
+                for item in results
+            ],
+            "confidence": confidence
+        }
