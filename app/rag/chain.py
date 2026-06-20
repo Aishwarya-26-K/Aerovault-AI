@@ -5,6 +5,7 @@ Adds:
 - retrieval confidence checking
 - hallucination prevention
 - source-aware answers
+- confidence label for UI
 """
 
 from app.config import get_settings
@@ -29,27 +30,25 @@ class RAGChain:
             return {
                 "question": question,
                 "answer": "No relevant information found.",
-                "sources": [],
-                "confidence": 0
+                "confidence": 0,
+                "confidence_label": "Low",
+                "sources": []
             }
 
 
-        # FAISS distance score:
-        # lower distance = better match
+        # Confidence calculation
+
         best_score = min(
             item["score"]
             for item in results
         )
 
-
-        # convert distance to confidence
         confidence = round(
-            1 / (1 + best_score),
+            max(0, 1 - (best_score / 10)),
             2
         )
 
 
-        # Level 2 threshold
         threshold = 0.35
 
 
@@ -59,14 +58,11 @@ class RAGChain:
                 "question": question,
                 "answer":
                     "I could not find enough information in the provided aviation documents.",
-                "sources": [
-                    {
-                        "file": item["filename"],
-                        "page": item["page"]
-                    }
-                    for item in results
-                ],
-                "confidence": confidence
+                "confidence": confidence,
+                "confidence_label":
+                    self.get_confidence_label(confidence),
+                "sources":
+                    self.get_sources(results)
             }
 
 
@@ -79,15 +75,22 @@ class RAGChain:
         prompt = f"""
 You are an aviation assistant.
 
-Answer ONLY from the context.
-If information is missing, say so.
+Answer only using the provided aviation document context.
+
+Do not use outside knowledge.
+
+If the information is missing, say:
+"I do not have enough information."
 
 Context:
+
 {context}
 
 
 Question:
+
 {question}
+
 
 Answer:
 """
@@ -98,13 +101,53 @@ Answer:
 
         return {
             "question": question,
-            "answer": response.content,
-            "sources": [
-                {
-                    "file": item["filename"],
-                    "page": item["page"]
-                }
-                for item in results
-            ],
-            "confidence": confidence
+            "answer": response.content.strip(),
+            "confidence": confidence,
+            "confidence_label":
+                self.get_confidence_label(confidence),
+            "sources":
+                self.get_sources(results)
         }
+
+
+
+    def get_sources(self, results):
+
+        unique = []
+
+        seen = set()
+
+
+        for item in results:
+
+            key = (
+                item["filename"],
+                item["page"]
+            )
+
+            if key not in seen:
+
+                unique.append(
+                    {
+                        "file": item["filename"],
+                        "page": item["page"]
+                    }
+                )
+
+                seen.add(key)
+
+
+        return unique
+
+
+
+    def get_confidence_label(self, confidence):
+
+        if confidence >= 0.75:
+            return "High"
+
+        elif confidence >= 0.50:
+            return "Medium"
+
+        else:
+            return "Low"
