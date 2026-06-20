@@ -57,7 +57,7 @@ class RAGChain:
             return {
                 "question": question,
                 "answer":
-                    "I could not find enough information in the provided aviation documents.",
+                    "The information is not available in the provided document(s)",
                 "confidence": confidence,
                 "confidence_label":
                     self.get_confidence_label(confidence),
